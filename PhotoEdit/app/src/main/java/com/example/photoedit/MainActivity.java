@@ -5,9 +5,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.view.View;
 import android.widget.Button;
 
@@ -17,6 +19,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        init();
     }
 
     private static final int REQUEST_PERMISSIONS = 1234;
@@ -56,6 +60,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private static final int REQUEST_PICK_IMAGE = 12345;
+
     private void init(){
 //        if(MainActivity.this.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
 //            findViewById(R.id.takePhotoButton).setVisibility(View.GONE);
@@ -65,7 +71,12 @@ public class MainActivity extends AppCompatActivity {
         selectImageButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-
+                final Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("image/*");
+                final Intent pickIntent = new Intent(Intent.ACTION_PICK);
+                pickIntent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
+                final Intent chooserIntent = Intent.createChooser(intent, "Select Image");
+                startActivityForResult(chooserIntent, REQUEST_PICK_IMAGE);
             }
 
         });
