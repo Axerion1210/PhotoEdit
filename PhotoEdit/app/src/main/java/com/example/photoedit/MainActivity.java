@@ -9,9 +9,16 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.FileObserver;
 import android.provider.MediaStore;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Toast;
+
+import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -86,9 +93,32 @@ public class MainActivity extends AppCompatActivity {
         takePhotoButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-
+                final Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                if(takePictureIntent.resolveActivity(getPackageManager()) != null){
+                    //create file for photo
+                    final File photoFile = createImageFile();
+                }
+                else {
+                    Toast.makeText(MainActivity.this, "Your Camera App is not compatible", Toast.LENGTH_SHORT).show();
+                }
             }
 
         });
+    }
+
+    private File createImageFile(){
+        final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        final String imageFileName = "/JPEG_" + timeStamp + ".jpg";
+        final File storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        return new File(storageDir+imageFileName);
+    }
+
+    @Override
+    public void onActivityResult (int requestCode, int resultCode, Intent data){
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if(resultCode != RESULT_OK){
+            return;
+        }
     }
 }
