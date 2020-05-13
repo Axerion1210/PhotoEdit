@@ -20,11 +20,14 @@
             android:textSize="30sp"/>
 
         <Button
+            android:id="@+id/selectImageButton"
             android:layout_marginBottom="20dp"
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:text="select image"/>
+
         <Button
+            android:id="@+id/takePhotoButton"
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:text="take photo"/>
