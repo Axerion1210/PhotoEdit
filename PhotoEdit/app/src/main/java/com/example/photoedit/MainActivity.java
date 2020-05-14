@@ -5,8 +5,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
+import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -97,6 +100,11 @@ public class MainActivity extends AppCompatActivity {
                 if(takePictureIntent.resolveActivity(getPackageManager()) != null){
                     //create file for photo
                     final File photoFile = createImageFile();
+                    imageUri = Uri.fromFile(photoFile);
+                    final SharedPreferences myPrefs = getSharedPreferences(appID,0);
+                    myPrefs.edit().putString("path", photoFile.getAbsolutePath()).apply();
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
                 }
                 else {
                     Toast.makeText(MainActivity.this, "Your Camera App is not compatible", Toast.LENGTH_SHORT).show();
@@ -106,12 +114,20 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private static final int REQUEST_IMAGE_CAPTURE = 1111;
+
+    private static final String appID = "photoEditor";
+
+    private Uri imageUri;
+
     private File createImageFile(){
         final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         final String imageFileName = "/JPEG_" + timeStamp + ".jpg";
         final File storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
         return new File(storageDir+imageFileName);
     }
+
+    private boolean editMode = false;
 
     @Override
     public void onActivityResult (int requestCode, int resultCode, Intent data){
@@ -120,5 +136,34 @@ public class MainActivity extends AppCompatActivity {
         if(resultCode != RESULT_OK){
             return;
         }
+
+        if(requestCode == REQUEST_IMAGE_CAPTURE){
+            if(imageUri == null){
+                final SharedPreferences p = getSharedPreferences(appID, 0);
+                final String path = p.getString("path","");
+                if(path.length() < 1){
+                    recreate();
+                    return;
+                }
+                imageUri = Uri.parse("file://" + path);
+            }
+            sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE));
+        }
+        else if(data == null){
+            recreate();
+            return;
+        }
+        else if(requestCode == REQUEST_PICK_IMAGE){
+            imageUri = data.getData();
+        }
+
+        final ProgressDialog dialog = ProgressDialog.show(MainActivity.this, "Loading", "Please wait...", true);
+
+        editMode = true;
+
+        findViewById(R.id.welcomeScreen).setVisibility(View.GONE);
+        findViewById(R.id.editScreen).setVisibility(View.VISIBLE);
+
+        dialog.cancel();
     }
 }
