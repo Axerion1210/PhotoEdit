@@ -1,169 +1,338 @@
 package com.example.photoedit;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.ActivityManager;
-import android.app.ProgressDialog;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.FileObserver;
-import android.provider.MediaStore;
+
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
-import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
-import java.io.File;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.viewpager.widget.ViewPager;
 
-public class MainActivity extends AppCompatActivity {
+import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.tabs.TabLayout;
+import com.karumi.dexter.Dexter;
+import com.karumi.dexter.MultiplePermissionsReport;
+import com.karumi.dexter.PermissionToken;
+import com.karumi.dexter.listener.PermissionRequest;
+import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
+import com.zomato.photofilters.imageprocessors.Filter;
+import com.zomato.photofilters.imageprocessors.subfilters.BrightnessSubFilter;
+import com.zomato.photofilters.imageprocessors.subfilters.ContrastSubFilter;
+import com.zomato.photofilters.imageprocessors.subfilters.SaturationSubfilter;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import com.example.photoedit.utils.BitmapUtils;
+
+public class MainActivity extends AppCompatActivity implements FiltersListFragment.FiltersListFragmentListener, EditImageFragment.EditImageFragmentListener {
+
+    private static final String TAG = MainActivity.class.getSimpleName();
+
+    public static final String IMAGE_NAME = "dog.jpg";
+
+    public static final int SELECT_GALLERY_IMAGE = 101;
+
+    @BindView(R.id.image_preview)
+    ImageView imagePreview;
+
+    @BindView(R.id.tabs)
+    TabLayout tabLayout;
+
+    @BindView(R.id.viewpager)
+    ViewPager viewPager;
+
+    @BindView(R.id.coordinator_layout)
+    CoordinatorLayout coordinatorLayout;
+
+    Bitmap originalImage;
+    // to backup image with filter applied
+    Bitmap filteredImage;
+
+    // the final image after applying
+    // brightness, saturation, contrast
+    Bitmap finalImage;
+
+    FiltersListFragment filtersListFragment;
+    EditImageFragment editImageFragment;
+
+    // modified image values
+    int brightnessFinal = 0;
+    float saturationFinal = 1.0f;
+    float contrastFinal = 1.0f;
+
+    // load native image filters library
+    static {
+        System.loadLibrary("NativeImageProcessor");
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        ButterKnife.bind(this);
 
-        init();
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setTitle(getString(R.string.activity_title_main));
+
+        loadImage();
+
+        setupViewPager(viewPager);
+        tabLayout.setupWithViewPager(viewPager);
     }
 
-    private static final int REQUEST_PERMISSIONS = 1234;
-    private static final String[] PERMISSIONS = {
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-    };
+    private void setupViewPager(ViewPager viewPager) {
+        ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
 
-    private static final int PERMISSION_COUNT = 2;
+        // adding filter list fragment
+        filtersListFragment = new FiltersListFragment();
+        filtersListFragment.setListener(this);
 
-    @SuppressLint("NewApi")
-    private boolean notPermissions(){
-        for(int i=0; i<PERMISSION_COUNT; i++){
-            if(checkSelfPermission(PERMISSIONS[i]) != PackageManager.PERMISSION_GRANTED){
-                return true;
-            }
-        }
-        return false;
+        // adding edit image fragment
+        editImageFragment = new EditImageFragment();
+        editImageFragment.setListener(this);
+
+        adapter.addFragment(filtersListFragment, getString(R.string.tab_filters));
+        adapter.addFragment(editImageFragment, getString(R.string.tab_edit));
+
+        viewPager.setAdapter(adapter);
     }
 
     @Override
-    protected void onResume(){
-        super.onResume();
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notPermissions()){
-                requestPermissions(PERMISSIONS, REQUEST_PERMISSIONS);
-        }
+    public void onFilterSelected(Filter filter) {
+        // reset image controls
+        resetControls();
+
+        // applying the selected filter
+        filteredImage = originalImage.copy(Bitmap.Config.ARGB_8888, true);
+        // preview filtered image
+        imagePreview.setImageBitmap(filter.processFilter(filteredImage));
+
+        finalImage = filteredImage.copy(Bitmap.Config.ARGB_8888, true);
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_PERMISSIONS && grantResults.length > 0){
-            if(notPermissions()){
-                ((ActivityManager) this.getSystemService(ACTIVITY_SERVICE)).clearApplicationUserData();
-                recreate();
-            }
+    public void onBrightnessChanged(final int brightness) {
+        brightnessFinal = brightness;
+        Filter myFilter = new Filter();
+        myFilter.addSubFilter(new BrightnessSubFilter(brightness));
+        imagePreview.setImageBitmap(myFilter.processFilter(finalImage.copy(Bitmap.Config.ARGB_8888, true)));
+    }
+
+    @Override
+    public void onSaturationChanged(final float saturation) {
+        saturationFinal = saturation;
+        Filter myFilter = new Filter();
+        myFilter.addSubFilter(new SaturationSubfilter(saturation));
+        imagePreview.setImageBitmap(myFilter.processFilter(finalImage.copy(Bitmap.Config.ARGB_8888, true)));
+    }
+
+    @Override
+    public void onContrastChanged(final float contrast) {
+        contrastFinal = contrast;
+        Filter myFilter = new Filter();
+        myFilter.addSubFilter(new ContrastSubFilter(contrast));
+        imagePreview.setImageBitmap(myFilter.processFilter(finalImage.copy(Bitmap.Config.ARGB_8888, true)));
+    }
+
+    @Override
+    public void onEditStarted() {
+
+    }
+
+    @Override
+    public void onEditCompleted() {
+        // once the editing is done i.e seekbar is drag is completed,
+        // apply the values on to filtered image
+        final Bitmap bitmap = filteredImage.copy(Bitmap.Config.ARGB_8888, true);
+
+        Filter myFilter = new Filter();
+        myFilter.addSubFilter(new BrightnessSubFilter(brightnessFinal));
+        myFilter.addSubFilter(new ContrastSubFilter(contrastFinal));
+        myFilter.addSubFilter(new SaturationSubfilter(saturationFinal));
+        finalImage = myFilter.processFilter(bitmap);
+    }
+
+    /**
+     * Resets image edit controls to normal when new filter
+     * is selected
+     */
+    private void resetControls() {
+        if (editImageFragment != null) {
+            editImageFragment.resetControls();
+        }
+        brightnessFinal = 0;
+        saturationFinal = 1.0f;
+        contrastFinal = 1.0f;
+    }
+
+    class ViewPagerAdapter extends FragmentPagerAdapter {
+        private final List<Fragment> mFragmentList = new ArrayList<>();
+        private final List<String> mFragmentTitleList = new ArrayList<>();
+
+        public ViewPagerAdapter(FragmentManager manager) {
+            super(manager);
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            return mFragmentList.get(position);
+        }
+
+        @Override
+        public int getCount() {
+            return mFragmentList.size();
+        }
+
+        public void addFragment(Fragment fragment, String title) {
+            mFragmentList.add(fragment);
+            mFragmentTitleList.add(title);
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            return mFragmentTitleList.get(position);
         }
     }
 
-    private static final int REQUEST_PICK_IMAGE = 12345;
-
-    private void init(){
-//        if(MainActivity.this.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
-//            findViewById(R.id.takePhotoButton).setVisibility(View.GONE);
-//        }
-        final Button selectImageButton = findViewById(R.id.selectImageButton);
-
-        selectImageButton.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View v) {
-                final Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                intent.setType("image/*");
-                final Intent pickIntent = new Intent(Intent.ACTION_PICK);
-                pickIntent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
-                final Intent chooserIntent = Intent.createChooser(intent, "Select Image");
-                startActivityForResult(chooserIntent, REQUEST_PICK_IMAGE);
-            }
-
-        });
-
-        final Button takePhotoButton = findViewById(R.id.takePhotoButton);
-
-        takePhotoButton.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View v) {
-                final Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                if(takePictureIntent.resolveActivity(getPackageManager()) != null){
-                    //create file for photo
-                    final File photoFile = createImageFile();
-                    imageUri = Uri.fromFile(photoFile);
-                    final SharedPreferences myPrefs = getSharedPreferences(appID,0);
-                    myPrefs.edit().putString("path", photoFile.getAbsolutePath()).apply();
-                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
-                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
-                }
-                else {
-                    Toast.makeText(MainActivity.this, "Your Camera App is not compatible", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-        });
+    // load the default image from assets on app launch
+    private void loadImage() {
+        originalImage = BitmapUtils.getBitmapFromAssets(this, IMAGE_NAME, 300, 300);
+        filteredImage = originalImage.copy(Bitmap.Config.ARGB_8888, true);
+        finalImage = originalImage.copy(Bitmap.Config.ARGB_8888, true);
+        imagePreview.setImageBitmap(originalImage);
     }
-
-    private static final int REQUEST_IMAGE_CAPTURE = 1111;
-
-    private static final String appID = "photoEditor";
-
-    private Uri imageUri;
-
-    private File createImageFile(){
-        final String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        final String imageFileName = "/JPEG_" + timeStamp + ".jpg";
-        final File storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        return new File(storageDir+imageFileName);
-    }
-
-    private boolean editMode = false;
 
     @Override
-    public void onActivityResult (int requestCode, int resultCode, Intent data){
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.action_open) {
+            openImageFromGallery();
+            return true;
+        }
+
+        if (id == R.id.action_save) {
+            saveImageToGallery();
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == RESULT_OK && requestCode == SELECT_GALLERY_IMAGE) {
+            Bitmap bitmap = BitmapUtils.getBitmapFromGallery(this, data.getData(), 800, 800);
 
-        if(resultCode != RESULT_OK){
-            return;
+            // clear bitmap memory
+            originalImage.recycle();
+            finalImage.recycle();
+            finalImage.recycle();
+
+            originalImage = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+            filteredImage = originalImage.copy(Bitmap.Config.ARGB_8888, true);
+            finalImage = originalImage.copy(Bitmap.Config.ARGB_8888, true);
+            imagePreview.setImageBitmap(originalImage);
+            bitmap.recycle();
+
+            // render selected image thumbnails
+            filtersListFragment.prepareThumbnail(originalImage);
         }
+    }
 
-        if(requestCode == REQUEST_IMAGE_CAPTURE){
-            if(imageUri == null){
-                final SharedPreferences p = getSharedPreferences(appID, 0);
-                final String path = p.getString("path","");
-                if(path.length() < 1){
-                    recreate();
-                    return;
-                }
-                imageUri = Uri.parse("file://" + path);
-            }
-            sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE));
-        }
-        else if(data == null){
-            recreate();
-            return;
-        }
-        else if(requestCode == REQUEST_PICK_IMAGE){
-            imageUri = data.getData();
-        }
+    private void openImageFromGallery() {
+        Dexter.withActivity(this).withPermissions(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                .withListener(new MultiplePermissionsListener() {
+                    @Override
+                    public void onPermissionsChecked(MultiplePermissionsReport report) {
+                        if (report.areAllPermissionsGranted()) {
+                            Intent intent = new Intent(Intent.ACTION_PICK);
+                            intent.setType("image/*");
+                            startActivityForResult(intent, SELECT_GALLERY_IMAGE);
+                        } else {
+                            Toast.makeText(getApplicationContext(), "Permissions are not granted!", Toast.LENGTH_SHORT).show();
+                        }
+                    }
 
-        final ProgressDialog dialog = ProgressDialog.show(MainActivity.this, "Loading", "Please wait...", true);
+                    @Override
+                    public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
+                        token.continuePermissionRequest();
+                    }
+                }).check();
+    }
 
-        editMode = true;
+    /*
+     * saves image to camera gallery
+     * */
+    private void saveImageToGallery() {
+        Dexter.withActivity(this).withPermissions(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                .withListener(new MultiplePermissionsListener() {
+                    @Override
+                    public void onPermissionsChecked(MultiplePermissionsReport report) {
+                        if (report.areAllPermissionsGranted()) {
+                            final String path = BitmapUtils.insertImage(getContentResolver(), finalImage, System.currentTimeMillis() + "_profile.jpg", null);
+                            if (!TextUtils.isEmpty(path)) {
+                                Snackbar snackbar = Snackbar
+                                        .make(coordinatorLayout, "Image saved to gallery!", Snackbar.LENGTH_LONG)
+                                        .setAction("OPEN", new View.OnClickListener() {
+                                            @Override
+                                            public void onClick(View view) {
+                                                openImage(path);
+                                            }
+                                        });
 
-        findViewById(R.id.welcomeScreen).setVisibility(View.GONE);
-        findViewById(R.id.editScreen).setVisibility(View.VISIBLE);
+                                snackbar.show();
+                            } else {
+                                Snackbar snackbar = Snackbar
+                                        .make(coordinatorLayout, "Unable to save image!", Snackbar.LENGTH_LONG);
 
-        dialog.cancel();
+                                snackbar.show();
+                            }
+                        } else {
+                            Toast.makeText(getApplicationContext(), "Permissions are not granted!", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
+                        token.continuePermissionRequest();
+                    }
+                }).check();
+
+    }
+
+    // opening image in default image viewer app
+    private void openImage(String path) {
+        Intent intent = new Intent();
+        intent.setAction(Intent.ACTION_VIEW);
+        intent.setDataAndType(Uri.parse(path), "image/*");
+        startActivity(intent);
     }
 }
