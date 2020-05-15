@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * Created by ravi on 06/11/17.
+ */
+
 public class BitmapUtils {
 
     private static final String TAG = BitmapUtils.class.getSimpleName();
@@ -175,6 +179,13 @@ public class BitmapUtils {
         return stringUrl;
     }
 
+    /**
+     * A copy of the Android internals StoreThumbnail method, it used with the insertImage to
+     * populate the android.provider.MediaStore.Images.Media#insertImage with all the correct
+     * meta data. The StoreThumbnail method is private so it must be duplicated here.
+     *
+     * @see android.provider.MediaStore.Images.Media (StoreThumbnail private method)
+     */
     private static final Bitmap storeThumbnail(
             ContentResolver cr,
             Bitmap source,

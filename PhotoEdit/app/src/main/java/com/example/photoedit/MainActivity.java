@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity implements FiltersListFragme
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
-    public static final String IMAGE_NAME = "dog.jpg";
+    public static final String IMAGE_NAME = "test.jpg";
 
     public static final int SELECT_GALLERY_IMAGE = 101;
 
@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements FiltersListFragme
 
     @BindView(R.id.coordinator_layout)
     CoordinatorLayout coordinatorLayout;
+
 
     Bitmap originalImage;
     // to backup image with filter applied
@@ -214,7 +215,7 @@ public class MainActivity extends AppCompatActivity implements FiltersListFragme
         }
     }
 
-    // load the default image from assets on app launch
+//     load the default image from assets on app launch
     private void loadImage() {
         originalImage = BitmapUtils.getBitmapFromAssets(this, IMAGE_NAME, 300, 300);
         filteredImage = originalImage.copy(Bitmap.Config.ARGB_8888, true);
