@@ -5,6 +5,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.SeekBar;
 
 import androidx.fragment.app.Fragment;
@@ -13,7 +14,7 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 
 
-public class EditImageFragment extends Fragment implements SeekBar.OnSeekBarChangeListener {
+public class EditImageFragment extends Fragment implements SeekBar.OnSeekBarChangeListener, View.OnClickListener {
 
     private EditImageFragmentListener listener;
 
@@ -25,6 +26,9 @@ public class EditImageFragment extends Fragment implements SeekBar.OnSeekBarChan
 
     @BindView(R.id.seekbar_saturation)
     SeekBar seekBarSaturation;
+
+    @BindView(R.id.black_white)
+    Button blackWhiteButton;
 
     public void setListener(EditImageFragmentListener listener) {
         this.listener = listener;
@@ -57,6 +61,8 @@ public class EditImageFragment extends Fragment implements SeekBar.OnSeekBarChan
         // keeping saturation value b/w 0.0 - 3.0
         seekBarSaturation.setMax(30);
         seekBarSaturation.setProgress(10);
+
+        blackWhiteButton.setOnClickListener(this);
 
         seekBarBrightness.setOnSeekBarChangeListener(this);
         seekBarContrast.setOnSeekBarChangeListener(this);
@@ -108,6 +114,15 @@ public class EditImageFragment extends Fragment implements SeekBar.OnSeekBarChan
         seekBarBrightness.setProgress(100);
         seekBarContrast.setProgress(0);
         seekBarSaturation.setProgress(10);
+    }
+
+    @Override
+    public void onClick(View v) {
+        if (v.getId() == R.id.black_white) {
+            seekBarBrightness.setProgress(100);
+            seekBarContrast.setProgress(0);
+            seekBarSaturation.setProgress(0);
+        }
     }
 
     public interface EditImageFragmentListener {

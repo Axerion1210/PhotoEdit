@@ -8,9 +8,9 @@
     <string name="lbl_brightness">BRIGHTNESS</string>
     <string name="lbl_contrast">CONTRAST</string>
     <string name="lbl_saturation">SATURATION</string>
+    <string name="lbl_blackwhite">BLACK AND WHITE</string>
     <string name="tab_filters">FILTERS</string>
     <string name="tab_edit">EDIT</string>
-
 
     <string name="roboto_medium">sans-serif-medium</string>
     <string name="filter_normal">Normal</string>
